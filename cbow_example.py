@@ -13,6 +13,7 @@ CONTEXT_SIZE = 2
 EMBEDDING_DIM = 2
 NUM_EPOCHS = 5
 NEGATIVE_SAMPLING = False
+USE_CUDA = True
 
 filename = "medium_text.txt"
 print("Parsing text and loading training data...")
@@ -27,18 +28,22 @@ else:
 model = CBOW(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE)
 optimizer = optim.SGD(model.parameters(), lr=0.001)
 
+cuda = (torch.cuda.is_available() and USE_CUDA)
+if cuda: 
+    model.cuda()
+Tensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
 print("Starting training")
 for epoch in range(NUM_EPOCHS):
-    total_loss = torch.Tensor([0])
+    total_loss = LossTensor([0])
     print("Beginning epoch %d" % epoch)
     progress_bar = progressbar.ProgressBar()
     for context, target in progress_bar(training_data):
-        context_var = autograd.Variable(torch.LongTensor(context))
-        focus_var = autograd.Variable(torch.LongTensor([target]))
+        context_var = autograd.Variable(Tensor(context))
+        focus_var = autograd.Variable(Tensor([target]))
         model.zero_grad()
         log_probs = model(context_var, focus_var)
-        loss = loss_function(log_probs, autograd.Variable(
-            torch.LongTensor([target])))
+        loss = loss_function(log_probs, autograd.Variable(Tensor([target])))
         loss.backward()
         optimizer.step()
         total_loss += loss.data
@@ -50,7 +55,7 @@ if EMBEDDING_DIM == 2:
     indices = np.random.choice(np.arange(len(vocab)), size=10, replace=False)
     for ind in indices:
         word = list(vocab.keys())[ind]
-        input = autograd.Variable(torch.LongTensor([word_to_ix[word]]))
+        input = autograd.Variable(Tensor([word_to_ix[word]]))
         vec = model.embeddings(input).data[0]
         x, y = vec[0], vec[1]
         plt.scatter(x, y)
