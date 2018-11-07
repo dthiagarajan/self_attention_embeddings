@@ -1,3 +1,4 @@
+import pickle
 import progressbar
 import matplotlib
 matplotlib.use('Agg')
@@ -5,20 +6,34 @@ import matplotlib.pyplot as plt
 
 from model import *
 from neg_loss import *
+from text_data import *
 from utils import *
+
+from torch.utils.data import DataLoader
+
 
 progressbar.streams.wrap_stderr()
 
 CONTEXT_SIZE = 2
 EMBEDDING_DIM = 2
-NUM_EPOCHS = 5
+NUM_EPOCHS = 40
+BATCH_SIZE = 32
 NEGATIVE_SAMPLING = False
 USE_CUDA = True
+PRE_LOADED = True
 
-filename = "medium_text.txt"
-print("Parsing text and loading training data...")
-processed_text, vocab, word_to_ix, ix_to_word, training_data = load_data(filename,
-                                                             CONTEXT_SIZE, model_type="cbow", subsampling=True, sampling_rate=0.001)
+filename = "/scratch/datasets/large_text.txt"
+if PRE_LOADED:
+    vocab = pickle.load(open('/scratch/datasets/vocab.pkl', 'rb'))
+    training_data = pickle.load(open('/scratch/datasets/training_data.pkl', 'rb'))
+    word_to_ix = pickle.load(open('/scratch/datasets/word_to_ix.pkl', 'rb'))
+    ix_to_word = pickle.load(open('/scratch/datasets/ix_to_word.pkl', 'rb'))
+else:
+    print("Parsing text and loading training data...")
+    processed_text, vocab, word_to_ix, ix_to_word, training_data = load_data(filename,
+                                                                CONTEXT_SIZE, model_type="cbow", subsampling=True, sampling_rate=0.001)
+
+dataloader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=1)
 
 losses = []
 if NEGATIVE_SAMPLING: 
@@ -33,22 +48,23 @@ if cuda:
     model.cuda()
 Tensor = torch.cuda.LongTensor if cuda else torch.LongTensor
 LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
-print("Starting training")
+print("Starting training", flush=True)
 for epoch in range(NUM_EPOCHS):
     total_loss = LossTensor([0])
-    print("Beginning epoch %d" % epoch)
+    print("Beginning epoch %d" % epoch, flush=True)
     progress_bar = progressbar.ProgressBar()
-    for context, target in progress_bar(training_data):
-        context_var = autograd.Variable(Tensor(context))
-        focus_var = autograd.Variable(Tensor([target]))
+    for context, target in progress_bar(dataloader):
+        context_var = autograd.Variable(torch.stack([Tensor(t) for t in context]))
+        focus_var = autograd.Variable(torch.stack([Tensor(t) for t in target]))
         model.zero_grad()
         log_probs = model(context_var, focus_var)
         loss = loss_function(log_probs, autograd.Variable(Tensor([target])))
         loss.backward()
         optimizer.step()
         total_loss += loss.data
-    print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]))
+    print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]), flush=True)
     losses.append(total_loss)
+torch.save(model.state_dict(), open('/scratch/datasets/models/self_attention_embedding_model.pt', 'wb'))
 
 # Visualize embeddings
 if EMBEDDING_DIM == 2:
@@ -62,3 +78,4 @@ if EMBEDDING_DIM == 2:
         plt.annotate(word, xy=(x, y), xytext=(5, 2),
                      textcoords='offset points', ha='right', va='bottom')
     plt.savefig("w2v.png")
+
