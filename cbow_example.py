@@ -15,9 +15,9 @@ from torch.utils.data import DataLoader
 progressbar.streams.wrap_stderr()
 
 CONTEXT_SIZE = 2
-EMBEDDING_DIM = 2
+EMBEDDING_DIM = 50
 NUM_EPOCHS = 40
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 NEGATIVE_SAMPLING = False
 USE_CUDA = True
 PRE_LOADED = True
@@ -45,6 +45,7 @@ optimizer = optim.SGD(model.parameters(), lr=0.001)
 
 cuda = (torch.cuda.is_available() and USE_CUDA)
 if cuda: 
+    print("Using CUDA", flush=True)
     model.cuda()
 Tensor = torch.cuda.LongTensor if cuda else torch.LongTensor
 LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
@@ -54,8 +55,8 @@ for epoch in range(NUM_EPOCHS):
     print("Beginning epoch %d" % epoch, flush=True)
     progress_bar = progressbar.ProgressBar()
     for context, target in progress_bar(dataloader):
-        context_var = autograd.Variable(torch.stack([Tensor(t) for t in context]))
-        focus_var = autograd.Variable(torch.stack([Tensor(t) for t in target]))
+        context_var = autograd.Variable(Tensor(torch.stack([Tensor(t) for t in context])))
+        focus_var = autograd.Variable(Tensor(torch.stack([Tensor(t) for t in target])))
         model.zero_grad()
         log_probs = model(context_var, focus_var)
         loss = loss_function(log_probs, autograd.Variable(Tensor([target])))
