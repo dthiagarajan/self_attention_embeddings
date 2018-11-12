@@ -21,12 +21,13 @@ class CBOW(nn.Module):
         self.linear = nn.Linear(embedding_dim, vocab_size)
 
     def forward(self, inputs, focus):
-        embeds = self.embeddings(inputs)
-        alpha = torch.mm(torch.mm(embeds, self.kernel), self.embeddings(focus).t())
-        alpha = F.softmax(alpha)
-        embeds = torch.sum(torch.mul(alpha, embeds), 0, keepdim=True)
+        context_embeds = self.embeddings(inputs).permute(1, 0, 2)
+        focus_embeds = self.embeddings(focus).permute(1, 2, 0)
+        alpha = torch.matmul(torch.matmul(context_embeds, self.kernel.unsqueeze(0)), focus_embeds).permute(0, 2, 1)
+        alpha = F.softmax(alpha, dim=-1)
+        embeds = torch.matmul(alpha, context_embeds)
         out = self.linear(embeds)
-        log_probs = F.log_softmax(out)
+        log_probs = F.log_softmax(out, dim=-1).squeeze(1)
         return log_probs
 
 

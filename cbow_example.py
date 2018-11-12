@@ -1,3 +1,4 @@
+import os
 import pickle
 import progressbar
 import matplotlib
@@ -55,15 +56,17 @@ for epoch in range(NUM_EPOCHS):
     print("Beginning epoch %d" % epoch, flush=True)
     progress_bar = progressbar.ProgressBar()
     for context, target in progress_bar(dataloader):
-        context_var = autograd.Variable(Tensor(torch.stack([Tensor(t) for t in context])))
-        focus_var = autograd.Variable(Tensor(torch.stack([Tensor(t) for t in target])))
+        context, target = [t.cuda() for t in context], [t.cuda() for t in target]
+        context_var = autograd.Variable(Tensor(torch.stack(context)))
+        focus_var = autograd.Variable(Tensor(torch.stack(target)))
         model.zero_grad()
         log_probs = model(context_var, focus_var)
-        loss = loss_function(log_probs, autograd.Variable(Tensor([target])))
+        loss = loss_function(log_probs, focus_var.squeeze())
         loss.backward()
         optimizer.step()
         total_loss += loss.data
     print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]), flush=True)
+    torch.save(model.state_dict(), open('/scratch/datasets/models/self_attention_embedding_model_%d.pt' % epoch, 'wb'))
     losses.append(total_loss)
 torch.save(model.state_dict(), open('/scratch/datasets/models/self_attention_embedding_model.pt', 'wb'))
 
