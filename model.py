@@ -1,3 +1,5 @@
+import gensim
+import os
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -29,5 +31,21 @@ class CBOW(nn.Module):
         out = self.linear(embeds)
         log_probs = F.log_softmax(out, dim=-1).squeeze(1)
         return log_probs
+
+
+class RareWordRegressor(nn.Module):
+    def __init__(self, embedding_type, *args):
+        if embedding_type == 'word2vec':
+            model = gensim.models.KeyedVectors.load_word2vec_format('/scratch/datasets/models/GoogleNews-vectors-negative300.bin')
+            self.embeddings = nn.Embedding.from_pretrained(torch.FloatTensor(model.vectors))
+        elif embedding_type == 'self_attention':
+            self.embeddings = model.embeddings
+        self.fc = nn.Linear(self.embeddings.embedding_dim, 1)
+
+    def forward(self, input):
+        embeds = self.embeddings(input)
+        out = self.fc(embeds)
+        out = F.relu(out)
+        return out
 
 

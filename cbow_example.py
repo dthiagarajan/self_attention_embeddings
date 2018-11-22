@@ -16,8 +16,8 @@ from torch.utils.data import DataLoader
 progressbar.streams.wrap_stderr()
 
 CONTEXT_SIZE = 2
-EMBEDDING_DIM = 50
-NUM_EPOCHS = 40
+EMBEDDING_DIM = 100
+NUM_EPOCHS = 5
 BATCH_SIZE = 256
 NEGATIVE_SAMPLING = False
 USE_CUDA = True
@@ -47,6 +47,7 @@ optimizer = optim.SGD(model.parameters(), lr=0.001)
 cuda = (torch.cuda.is_available() and USE_CUDA)
 if cuda: 
     print("Using CUDA", flush=True)
+    model = nn.DataParallel(model)
     model.cuda()
 Tensor = torch.cuda.LongTensor if cuda else torch.LongTensor
 LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
@@ -58,17 +59,18 @@ for epoch in range(NUM_EPOCHS):
     for context, target in progress_bar(dataloader):
         context, target = [t.cuda() for t in context], [t.cuda() for t in target]
         context_var = autograd.Variable(Tensor(torch.stack(context)))
-        focus_var = autograd.Variable(Tensor(torch.stack(target)))
+        focus_var = autograd.Variable(Tensor(torch.stack(target))).unsqueeze(0)
         model.zero_grad()
         log_probs = model(context_var, focus_var)
         loss = loss_function(log_probs, focus_var.squeeze())
         loss.backward()
         optimizer.step()
-        total_loss += loss.data
+        total_loss += float(loss.data)
     print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]), flush=True)
-    torch.save(model.state_dict(), open('/scratch/datasets/models/self_attention_embedding_model_%d.pt' % epoch, 'wb'))
+    out_file = '/scratch/datasets/models/self_attention_embedding_model_%d_%d.pt' % (EMBEDDING_DIM, epoch)
+    os.system('touch %s' % out_file)
+    torch.save(model.state_dict(), open(out_file, 'wb'))
     losses.append(total_loss)
-torch.save(model.state_dict(), open('/scratch/datasets/models/self_attention_embedding_model.pt', 'wb'))
 
 # Visualize embeddings
 if EMBEDDING_DIM == 2:
