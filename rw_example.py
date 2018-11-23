@@ -13,18 +13,22 @@ progressbar.streams.wrap_stderr()
 
 CONTEXT_SIZE = 2
 EMBEDDING_DIM = 50
+EMBEDDING_TYPE = 'word2vec'
 NUM_EPOCHS = 5
-BATCH_SIZE = 8
+BATCH_SIZE = 1
 USE_CUDA = True
-DATA_PATH = "/share/nikola/export/rw.txt"
-MODEL_PATH = "/scratch/datasets/models/self_attention_embedding_model_%d_%d.pt.txt" % (EMBEDDING_DIM, NUM_EPOCHS - 1)
+DATA_PATH = "/share/nikola/export/dt372/rw.txt"
+MODEL_PATH = "/scratch/datasets/models/self_attention_embedding_model_%d_%d.pt" % (EMBEDDING_DIM, NUM_EPOCHS - 1)
 VOCAB = pickle.load(open('/scratch/datasets/vocab.pkl', 'rb'))
 
-embedding_model = CBOW(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE)
-embedding_model.load_state_dict(torch.load(MODEL_PATH))
-model = RareWordRegressor('self_attention', embedding_model)
+if EMBEDDING_TYPE == 'word2vec':
+    model = RareWordRegressor('word2vec')
+else:
+    embedding_model = CBOW(len(VOCAB), EMBEDDING_DIM, CONTEXT_SIZE)
+    embedding_model.load_state_dict(torch.load(MODEL_PATH))
+    model = RareWordRegressor('self_attention', embedding_model)
 
-training_data = RareWordData(DATA_PATH, VOCAB)
+training_data = RareWordDataset(DATA_PATH, VOCAB)
 dataloader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=1)
 
 losses = []
@@ -36,7 +40,9 @@ if cuda:
     print("Using CUDA", flush=True)
     model = nn.DataParallel(model)
     model.cuda()
-Tensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+model.train()
+LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
 print("Starting training", flush=True)
 for epoch in range(NUM_EPOCHS):
@@ -46,7 +52,9 @@ for epoch in range(NUM_EPOCHS):
     for input, target in progress_bar(dataloader):
         model.zero_grad()
         if cuda:
-            input, target = input.cuda(), target.cuda()
+            input, target = [it.cuda() for it in input], [it.cuda() for it in target]
+        input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
+        target = autograd.Variable(FloatTensor(torch.stack(target).float()))
         preds = model(input)
         loss = loss_function(preds, target)
         loss.backward()
@@ -55,3 +63,19 @@ for epoch in range(NUM_EPOCHS):
     print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]), flush=True)
     losses.append(total_loss)
 
+dataloader = DataLoader(training_data, batch_size=1, shuffle=True, num_workers=1)
+model.eval()
+for input, target in progress_bar(dataloader):
+    model.zero_grad()
+    if cuda:
+        input, target = [it.cuda() for it in input], [it.cuda() for it in target]
+    input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
+    target = autograd.Variable(FloatTensor(torch.stack(target).float()))
+    preds = model(input)
+    print(preds)
+    print(target)
+    print('----')
+    loss = loss_function(preds, target)
+    loss.backward()
+    optimizer.step()
+    total_loss += float(loss.data)
