@@ -52,4 +52,23 @@ class RareWordRegressor(nn.Module):
         out = F.relu(out).squeeze(1)
         return out
 
+class WordSimRegressor(nn.Module):
+    def __init__(self, embedding_type, *args):
+        super(WordSimRegressor, self).__init__()
+        if embedding_type == 'word2vec':
+            model = gensim.models.KeyedVectors.load_word2vec_format(
+                '/scratch/datasets/models/GoogleNews-vectors-negative300.bin', binary=True)
+            self.embeddings = nn.Embedding.from_pretrained(
+                torch.FloatTensor(model.vectors))
+        elif embedding_type == 'self_attention':
+            model = args[0]
+            self.embeddings = model.embeddings
+        self.embeddings.requires_grad = False
+        self.fc = nn.Linear(self.embeddings.embedding_dim * 2, 1)
 
+    def forward(self, input):
+        embeds = self.embeddings(input)
+        sim = torch.cat((embeds[:, 0, :], embeds[:, 1, :]), dim=1)
+        out = self.fc(sim)
+        out = F.relu(out).squeeze(1)
+        return out
