@@ -18,15 +18,16 @@ def WordSimDataset(Dataset):
     def __init__(self, filename, vocab, n_values=range(3, 7)):
         self.ps = PorterStemmer()
         self.data = []
-        skip = 0
+        num = -1
         with open(filename, "r") as f:
-            for line in [line.strip().split(',') for line in f]:
-                skip +=1 
-                if skip == 1:
-                    continue 
-
-                first, second = line[0], line[1]
-                scores = line[2:]
+            num = -1
+            for line in f:
+                num += 1
+                if num == 0:
+                    continue
+                all_line = line.replace('\n', '').split(',')
+                first, second = all_line[0], all_line[1]
+                scores = all_line[3:]
                 if first not in vocab:
                     temp = self.ps.stem(first)
                     if temp not in vocab:

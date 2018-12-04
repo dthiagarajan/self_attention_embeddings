@@ -4,7 +4,7 @@ import progressbar
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
+from WordSim import * 
 from model import *
 from rare_word_data import *
 from torch.utils.data import DataLoader
@@ -17,9 +17,9 @@ EMBEDDING_TYPE = 'word2vec'
 NUM_EPOCHS = 5
 BATCH_SIZE = 1
 USE_CUDA = True
-DATA_PATH = "/share/nikola/export/dt372/rw.txt"
-MODEL_PATH = "/scratch/datasets/models/self_attention_embedding_model_%d_%d.pt" % (EMBEDDING_DIM, NUM_EPOCHS - 1)
-VOCAB = pickle.load(open('/scratch/datasets/vocab.pkl', 'rb'))
+DATA_PATH = "/Users/Amar/Downloads/wordsim353/combined_data.csv"  # data file in memory
+MODEL_PATH = "/Users/Amar/Downloads/checkpoints/self_attention_embedding_model_%d_%d.pt" % (EMBEDDING_DIM, NUM_EPOCHS - 1)  # model from email
+VOCAB = pickle.load(open('/Users/Amar/Downloads/vocab.pkl', 'rb'))
 
 if EMBEDDING_TYPE == 'word2vec':
     model = RareWordRegressor('word2vec')
@@ -28,7 +28,7 @@ else:
     embedding_model.load_state_dict(torch.load(MODEL_PATH))
     model = RareWordRegressor('self_attention', embedding_model)
 
-training_data = RareWordDataset(DATA_PATH, VOCAB)
+training_data = WordSimDataset(DATA_PATH, VOCAB)
 dataloader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=1)
 
 losses = []
