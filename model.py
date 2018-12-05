@@ -6,6 +6,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+
+''' Continuous bag-of-words model for self-attention word2vec.
+
+Parameters:
+    vocab_size: number of defined words in the vocab
+    embedding_dim: desired embedded vector dimension
+    context_size: number of context words used
+
+'''
+class VanillaCBOW(nn.Module):
+
+    def __init__(self, vocab_size, embedding_dim, context_size):
+        super(VanillaCBOW, self).__init__()
+        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.linear = nn.Linear(embedding_dim, vocab_size)
+
+    def forward(self, inputs):
+        embeds = torch.mean(self.embeddings(inputs), dim=0)
+        out = self.linear(embeds)
+        log_probs = F.log_softmax(out, dim=-1).squeeze()
+        return log_probs
+
+
 ''' Continuous bag-of-words model for self-attention word2vec.
 
 Parameters:
@@ -41,7 +64,7 @@ class RareWordRegressor(nn.Module):
             self.embeddings = nn.Embedding.from_pretrained(torch.FloatTensor(model.vectors))
         elif embedding_type == 'self_attention':
             model = args[0]
-            self.embeddings = model.embeddings
+            self.embeddings = model.module.embeddings
         self.embeddings.requires_grad = False
         self.fc = nn.Linear(self.embeddings.embedding_dim * 2, 1)
 

@@ -16,7 +16,7 @@ class RareWordDataset(Dataset):
         self.ps = PorterStemmer()
         self.data = []
         with open(filename, "r") as f:
-            for line in [line.strip().split() for line in f]:
+            for line in [line.strip().lower().split() for line in f]:
                 word_pair = (line[0], line[1])
                 scores = line[2:]
                 if line[0] not in vocab:
