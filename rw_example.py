@@ -12,78 +12,77 @@ from torch.utils.data import DataLoader
 progressbar.streams.wrap_stderr()
 
 CONTEXT_SIZE = 2
-EMBEDDING_DIM = 100
-EMBEDDING_TYPE = 'self_attention'
-# EMBEDDING_TYPE = 'word2vec'
+EMBEDDING_DIMS = [50, 100, 200]
+EMBEDDING_TYPES = ['self_attention', 'word2vec']
 NUM_EPOCHS = 5
+CUTOFFS = [1, 2, 3]
 BATCH_SIZE = 1
 USE_CUDA = True
 DATA_PATH = "/share/nikola/export/dt372/rw.txt"
-MODEL_PATH = "/scratch/datasets/models/self_attention_embedding_model_%d_%d.pt" % (EMBEDDING_DIM, NUM_EPOCHS - 1)
 VOCAB = pickle.load(open('/scratch/datasets/vocab.pkl', 'rb'))
+VOCAB_IDX = pickle.load(open('/share/nikola/export/dt372/word_to_ix.pkl', 'rb'))
 cuda = (torch.cuda.is_available() and USE_CUDA)
-
-print("Using %s to regress rare word similarity" % EMBEDDING_TYPE)
-if EMBEDDING_TYPE == 'word2vec':
-    model = RareWordRegressor('word2vec')
-else:
-    embedding_model = CBOW(len(VOCAB), EMBEDDING_DIM, CONTEXT_SIZE)
-    if cuda:
-        embedding_model = nn.DataParallel(embedding_model)
-    embedding_model.load_state_dict(torch.load(MODEL_PATH))
-    model = RareWordRegressor('self_attention', embedding_model)
-
-training_data = RareWordDataset(DATA_PATH, VOCAB)
+training_data = RareWordDataset(DATA_PATH, VOCAB, VOCAB_IDX)
 dataloader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=1)
+all_losses = {}
+for EMBEDDING_DIM in EMBEDDING_DIMS:
+    for EMBEDDING_TYPE in EMBEDDING_TYPES:
+        for CUTOFF in CUTOFFS:
+            model_descr = "%s_embedding_model_%d_%d.pt" % (EMBEDDING_TYPE, EMBEDDING_DIM, CUTOFF - 1)
+            print("Running model %s_embedding_model_%d_%d.pt" % (EMBEDDING_TYPE, EMBEDDING_DIM, CUTOFF - 1))
+            MODEL_PATH = "/share/nikola/export/dt372/%s_embedding_model_%d_%d.pt" % (EMBEDDING_TYPE, EMBEDDING_DIM, CUTOFF - 1)
+            model = WordSimRegressor(EMBEDDING_TYPE, MODEL_PATH)
+            losses = []
+            loss_function = nn.MSELoss()
+            optimizer = optim.SGD(model.parameters(), lr=0.001)
 
-losses = []
-loss_function = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(), lr=0.001)
-
-if cuda: 
-    print("Using CUDA", flush=True)
-    model = nn.DataParallel(model)
-    model.cuda()
-model.train()
-LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
-FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
-print("Starting training", flush=True)
-for epoch in range(NUM_EPOCHS):
-    total_loss = LossTensor([0])
-    print("Beginning epoch %d" % epoch, flush=True)
-    progress_bar = progressbar.ProgressBar()
-    for input, target in progress_bar(dataloader):
-        model.zero_grad()
-        if cuda:
-            input, target = [it.cuda() for it in input], [it.cuda() for it in target]
-        input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
-        target = autograd.Variable(FloatTensor(torch.stack(target).float()))
-        preds = model(input)
-        loss = loss_function(preds, target)
-        loss.backward()
-        optimizer.step()
-        total_loss += float(loss.data)
-    print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]), flush=True)
-    losses.append(total_loss)
-if EMBEDDING_TYPE == 'self_attention':
-    out_file = "/scratch/datasets/models/rare_word_%s_%d_model.pt" % (EMBEDDING_TYPE, EMBEDDING_DIM)
-elif EMBEDDING_TYPE == 'word2vec':
-    out_file = '/scratch/datasets/models/rare_word_word2vec_300_model.pt'
-os.system('touch %s' % out_file)
-torch.save(model.state_dict(), open(out_file, 'wb'))
-
-dataloader = DataLoader(training_data, batch_size=1, shuffle=True, num_workers=1)
-progress_bar = progressbar.ProgressBar()
-model.eval()
-total_loss = LossTensor([0])
-for input, target in progress_bar(dataloader):
-    model.zero_grad()
-    if cuda:
-        input, target = [it.cuda() for it in input], [it.cuda() for it in target]
-    input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
-    target = autograd.Variable(FloatTensor(torch.stack(target).float()))
-    preds = model(input)
-    loss = loss_function(preds, target)
-    total_loss += float(loss.data)
-print("Total Loss", total_loss)
+            cuda = (torch.cuda.is_available() and USE_CUDA)
+            if cuda: 
+                print("Using CUDA", flush=True)
+                model = nn.DataParallel(model)
+                model.cuda()
+            model.train()
+            LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+            FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+            LossTensor = torch.cuda.FloatTensor if cuda else torch.Tensor 
+            print("Starting training", flush=True)
+            for epoch in range(NUM_EPOCHS):
+                total_loss = LossTensor([0])
+                print("Beginning epoch %d" % epoch, flush=True)
+                progress_bar = progressbar.ProgressBar()
+                for input, target in progress_bar(dataloader):
+                    model.zero_grad()
+                    if cuda:
+                        input, target = [it.cuda() for it in input], [it.cuda() for it in target]
+                    input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
+                    target = autograd.Variable(FloatTensor(torch.stack(target).float()))
+                    preds = model(input)
+                    loss = loss_function(preds, target)
+                    loss.backward()
+                    optimizer.step()
+                    total_loss += float(loss.data)
+                print("Epoch %d Loss: %.5f" % (epoch, total_loss[0]), flush=True)
+                losses.append(total_loss)
+            out_file = '/share/nikola/export/dt372/rw_%s.pt' % (model_descr)
+            os.system('touch %s' % out_file)
+            torch.save(model.state_dict(), open(out_file, 'wb'))
+            progress_bar = progressbar.ProgressBar()
+            dataloader = DataLoader(training_data, batch_size=1, shuffle=True, num_workers=1)
+            model.eval()
+            total_loss = 0.
+            print("Starting evaluation", flush=True)
+            for input, target in progress_bar(dataloader):
+                model.zero_grad()
+                if cuda:
+                    input, target = [it.cuda() for it in input], [it.cuda() for it in target]
+                input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
+                target = autograd.Variable(FloatTensor(torch.stack(target).float()))
+                preds = model(input)
+                loss = loss_function(preds, target)
+                loss.backward()
+                optimizer.step()
+                total_loss += float(loss.data)
+            print("For %s, loss is %.5f" % (model_descr, total_loss))
+            all_losses[model_descr] = total_loss
+for k, v in all_losses.items():
+    print("%s: %.5f" % (k, v))

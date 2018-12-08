@@ -14,8 +14,8 @@ def estimate_subword(word, vocab, n_values):
 
 
 
-def WordSimDataset(Dataset):
-    def __init__(self, filename, vocab, n_values=range(3, 7)):
+class WordSimDataset(Dataset):
+    def __init__(self, filename, vocab, vocab_idx, n_values=range(3, 7)):
         self.ps = PorterStemmer()
         self.data = []
         num = -1
@@ -42,7 +42,9 @@ def WordSimDataset(Dataset):
                         if temp is None:
                             continue
                     second = temp
-                i1, i2 = vocab[first] , vocab[second]
+                i1, i2 = vocab_idx[first] , vocab_idx[second]
+                assert i1 < len(vocab), i1
+                assert i2 < len(vocab), i2
                 self.data.extend([((i1, i2), float(score))
                                   for score in scores])
 

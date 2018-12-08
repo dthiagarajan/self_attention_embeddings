@@ -12,7 +12,7 @@ def estimate_subword(word, vocab, n_values):
     return min_word
 
 class RareWordDataset(Dataset):
-    def __init__(self, filename, vocab, n_values=range(3,7)):
+    def __init__(self, filename, vocab, vocab_idx, n_values=range(3,7)):
         self.ps = PorterStemmer()
         self.data = []
         with open(filename, "r") as f:
@@ -31,7 +31,7 @@ class RareWordDataset(Dataset):
                         temp = estimate_subword(line[1], vocab, n_values)
                         if temp is None: continue 
                     line[1] = temp
-                i1, i2 = vocab[line[0]] if line[0] in vocab else float(len(vocab)), vocab[line[1]] if line[1] in vocab else float(len(vocab))
+                i1, i2 = vocab_idx[line[0]] if line[0] in vocab_idx else float(len(vocab)), vocab_idx[line[1]] if line[1] in vocab_idx else float(len(vocab))
                 self.data.extend([((i1, i2), float(score)) for score in scores])
     
     def __len__(self):

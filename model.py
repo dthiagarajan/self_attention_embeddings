@@ -57,14 +57,13 @@ class CBOW(nn.Module):
 
 
 class RareWordRegressor(nn.Module):
-    def __init__(self, embedding_type, *args):
+    def __init__(self, embedding_type, model_path, *args):
         super(RareWordRegressor, self).__init__()
-        if embedding_type == 'word2vec':
-            model = gensim.models.KeyedVectors.load_word2vec_format('/scratch/datasets/models/GoogleNews-vectors-negative300.bin', binary=True)
-            self.embeddings = nn.Embedding.from_pretrained(torch.FloatTensor(model.vectors))
-        elif embedding_type == 'self_attention':
-            model = args[0]
-            self.embeddings = model.module.embeddings
+        pretrained_model_params = torch.load(model_path)
+        if 'embeddings.weight' in pretrained_model_params:
+            self.embeddings = nn.Embedding.from_pretrained(pretrained_model_params['embeddings.weight'])
+        elif 'module.embeddings.weight' in pretrained_model_params:
+            self.embeddings = nn.Embedding.from_pretrained(pretrained_model_params['module.embeddings.weight'])
         self.embeddings.requires_grad = False
         self.fc = nn.Linear(self.embeddings.embedding_dim * 2, 1)
 
@@ -76,19 +75,15 @@ class RareWordRegressor(nn.Module):
         return out
 
 class WordSimRegressor(nn.Module):
-    def __init__(self, embedding_type, *args):
+    def __init__(self, embedding_type, model_path, *args):
         super(WordSimRegressor, self).__init__()
-        if embedding_type == 'word2vec':
-            model = gensim.models.KeyedVectors.load_word2vec_format(
-                '/scratch/datasets/models/GoogleNews-vectors-negative300.bin', binary=True)
-            self.embeddings = nn.Embedding.from_pretrained(
-                torch.FloatTensor(model.vectors))
-        elif embedding_type == 'self_attention':
-            model = args[0]
-            self.embeddings = model.embeddings
+        pretrained_model_params = torch.load(model_path)
+        if 'embeddings.weight' in pretrained_model_params:
+            self.embeddings = nn.Embedding.from_pretrained(pretrained_model_params['embeddings.weight'])
+        elif 'module.embeddings.weight' in pretrained_model_params:
+            self.embeddings = nn.Embedding.from_pretrained(pretrained_model_params['module.embeddings.weight'])
         self.embeddings.requires_grad = False
         self.fc = nn.Linear(self.embeddings.embedding_dim * 2, 1)
-
     def forward(self, input):
         embeds = self.embeddings(input)
         sim = torch.cat((embeds[:, 0, :], embeds[:, 1, :]), dim=1)
