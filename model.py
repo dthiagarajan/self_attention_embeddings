@@ -90,3 +90,23 @@ class WordSimRegressor(nn.Module):
         out = self.fc(sim)
         out = F.relu(out).squeeze(1)
         return out
+
+
+class SentRegressor(nn.Module):
+    def __init__(self, embedding_type, model_path, *args):
+        super(SentRegressor, self).__init__()
+        pretrained_model_params = torch.load(model_path)
+        if 'embeddings.weight' in pretrained_model_params:
+            self.embeddings = nn.Embedding.from_pretrained(
+                pretrained_model_params['embeddings.weight'])
+        elif 'module.embeddings.weight' in pretrained_model_params:
+            self.embeddings = nn.Embedding.from_pretrained(
+                pretrained_model_params['module.embeddings.weight'])
+        self.embeddings.requires_grad = False
+        self.fc = nn.Linear(self.embeddings.embedding_dim, 2)
+
+    def forward(self, input):
+        embeds = torch.mean(self.embeddings(input), dim=0)
+        out = self.fc(embeds)
+        out = F.softmax(out).squeeze(1)
+        return out
