@@ -1,6 +1,12 @@
 from nltk.stem import PorterStemmer
 from torch.utils.data import Dataset, DataLoader
 import pickle as pkl
+
+
+''' 
+0 for negative, 1 for positive.
+'''
+
 def estimate_subword(word, vocab, n_values):
     min_word, min_freq = None, len(vocab)
     for n in n_values:
@@ -41,11 +47,11 @@ class Sent(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
-# def main():
-#     raw = '/Users/Amar/Documents/CS 6788/self_attention_embeddings/data/moview_review_data_polarity/review_polarity_test.txt'
-#     vb = pkl.load(open('/Users/Amar/Downloads/wordsim353/vocab.pkl', 'rb'))
-#     vbidx = pkl.load(open('/Users/Amar/Downloads/wordsim353/word_to_ix.pkl', 'rb'))
-#     ds = Sent(raw,vb,vbidx)
-#     print(ds.__getitem__(4))
-# if __name__ == '__main__':
-#     main()
+def main():
+    raw = '/home/dt372/self_attention_embeddings/data/moview_review_data_polarity/review_polarity_test.txt'
+    vb = pkl.load(open('/share/nikola/export/dt372/vocab.pkl', 'rb'))
+    vbidx = pkl.load(open('/share/nikola/export/dt372/word_to_ix.pkl', 'rb'))
+    ds = Sent(raw,vb,vbidx)
+    print(ds[4])
+if __name__ == '__main__':
+    main()
