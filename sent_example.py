@@ -71,15 +71,16 @@ for EMBEDDING_DIM in EMBEDDING_DIMS:
                 print("Epoch %d Loss: %.5f" %
                       (epoch, total_loss[0]), flush=True)
                 losses.append(total_loss)
-            out_file = '/share/nikola/export/dt372/wsim_%s.pt' % (model_descr)
+            out_file = '/share/nikola/export/dt372/sent_%s.pt' % (model_descr)
             os.system('touch %s' % out_file)
             torch.save(model.state_dict(), open(out_file, 'wb'))
             progress_bar = progressbar.ProgressBar()
             dataloader = DataLoader(
                 training_data, batch_size=1, shuffle=True, num_workers=1)
             model.eval()
-            total_loss = 0.
             print("Starting evaluation", flush=True)
+            neg_acc, pos_acc = 0., 0.
+            neg_total, pos_total = 0., 0.
             for input, target in progress_bar(dataloader):
                 model.zero_grad()
                 if cuda:
@@ -89,12 +90,17 @@ for EMBEDDING_DIM in EMBEDDING_DIMS:
                     torch.stack(input, dim=1).long()))
                 target = autograd.Variable(
                     FloatTensor(torch.stack(target).float()))
-                preds = model(input)
-                loss = loss_function(preds, target)
-                loss.backward()
-                optimizer.step()
-                total_loss += float(loss.data)
-            print("For %s, loss is %.5f" % (model_descr, total_loss))
-            all_losses[model_descr] = total_loss
+                with torch.zero_grad():
+                    preds = model(input)
+                    pred_label = preds.argmax(1).detach()
+                neg_idx, pos_idx = (pred_label == 0.), (pred_label == 1.)
+                neg_acc += (pred_label == target)[neg_idx].sum()
+                neg_total += (target == 0).sum()
+                pos_acc += (pred_label == target)[pos_idx].sum()
+                pos_total += (target == 1).sum()
+            print("For %s, negative accuracy is %.5f" % (model_descr, neg_acc / (neg_total)))
+            print("For %s, positive accuracy is %.5f" % (model_descr, pos_acc / (pos_total)))
+            print("For %s, total accuracy is %.5f" % (model_descr, (neg_acc + pos_acc) / (neg_total + pos_total)))
+            all_losses[model_descr] = (neg_acc, neg_total, pos_acc, pos_total, (neg_acc + pos_acc), (neg_total + pos_total))
 for k, v in all_losses.items():
-    print("%s: %.5f" % (k, v))
+    print("%s:\t%s" % (k, str(v)))

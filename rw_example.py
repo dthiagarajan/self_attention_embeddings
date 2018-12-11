@@ -78,9 +78,9 @@ for EMBEDDING_DIM in EMBEDDING_DIMS:
                 input = autograd.Variable(LongTensor(torch.stack(input, dim=1).long()))
                 target = autograd.Variable(FloatTensor(torch.stack(target).float()))
                 preds = model(input)
-                loss = loss_function(preds, target)
-                loss.backward()
-                optimizer.step()
+                with torch.no_grad():
+                    preds = model(input)
+                    loss = loss_function(preds, target)
                 total_loss += float(loss.data)
             print("For %s, loss is %.5f" % (model_descr, total_loss))
             all_losses[model_descr] = total_loss
